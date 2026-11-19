@@ -1,0 +1,9 @@
+{
+  "name": "piwork-registry",
+  "private": true,
+  "description": "PiWork 插件市场索引 —— 合并各插件仓库的发布产物",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "node scripts/build-registry.mjs"
+  }
+}

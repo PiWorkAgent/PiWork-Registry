@@ -1,0 +1,74 @@
+name: Refresh registry
+
+# 把 sources.json 里每个插件源的最新索引合并成客户端读的市场索引，并发布成
+# release 资产：
+#
+#   https://github.com/<owner>/PiWork-Registry/releases/latest/download/index.json
+#
+# 触发：sources.json 变更（push main）、定时刷新、手动。索引没变化时不发布，
+# 避免每个 cron 周期都造一个 release。
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: registry
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # 单个源失败只会被跳过并打 warning；全部失败才退出非零。
+      - name: Build index from sources
+        run: node scripts/build-registry.mjs
+
+      - name: Publish when the index changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f dist/index.json ]; then
+            echo "no index produced (plugins not published yet) — skipping"
+            exit 0
+          fi
+          CHANGED=1
+          if curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/index.json" -o /tmp/current.json 2>/dev/null; then
+            if node -e "
+              const fs = require('fs');
+              const plugins = (p) => JSON.stringify(JSON.parse(fs.readFileSync(p, 'utf8')).plugins);
+              process.exit(plugins('/tmp/current.json') === plugins('dist/index.json') ? 0 : 1);
+            "; then
+              CHANGED=0
+            fi
+          fi
+          if [ "$CHANGED" = "0" ]; then
+            echo "registry unchanged — nothing to publish"
+            exit 0
+          fi
+          TAG="registry-$(date -u +%Y%m%d-%H%M%S)"
+          node -e '
+            const idx = require("./dist/index.json");
+            const lines = idx.plugins.map(
+              (p) => "- " + (p.official ? "官方" : "社区") + " `" + p.id + "` v" + p.version,
+            );
+            require("fs").writeFileSync("notes.md", lines.join("\n") + "\n");
+          '
+          gh release create "$TAG" dist/index.json \
+            --title "Plugin registry $TAG" \
+            --notes-file notes.md \
+            --latest
+          echo "published $TAG"

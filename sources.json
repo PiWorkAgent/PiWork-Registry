@@ -1,0 +1,35 @@
+{
+  "registryVersion": 1,
+  "sources": [
+    {
+      "id": "com.pi.browser",
+      "repo": "PiWorkAgent/PiWork-Plugin-Browser",
+      "official": true,
+      "categories": ["工具"]
+    },
+    {
+      "id": "com.pi.devdocs",
+      "repo": "PiWorkAgent/PiWork-Plugin-Docs",
+      "official": true,
+      "categories": ["开发"]
+    },
+    {
+      "id": "com.pi.diagnostics",
+      "repo": "PiWorkAgent/PiWork-Plugin-Diagnostics",
+      "official": true,
+      "categories": ["开发"]
+    },
+    {
+      "id": "com.pi.files",
+      "repo": "PiWorkAgent/PiWork-Plugin-Files",
+      "official": true,
+      "categories": ["工具"]
+    },
+    {
+      "id": "com.pi.tasks",
+      "repo": "PiWorkAgent/PiWork-Plugin-Tasks",
+      "official": true,
+      "categories": ["效率"]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+name: Plugin release (reusable)
+
+# 插件仓库调用的复用工作流。调用方只需要：
+#
+#   jobs:
+#     release:
+#       uses: PiWorkAgent/PiWork-Registry/.github/workflows/plugin-release.yml@main
+#       permissions:
+#         contents: write
+#
+# 约定（registry 依赖它）：
+#   - 插件在仓库根目录：manifest.json + package.json
+#   - 必须定义 `build` 脚本（静态插件可以没有）
+#   - tag 形如 `v<manifest.version>`；workflow_dispatch 时由 manifest 版本决定
+#   - Release 资产：<id>-<version>.zip + index.json
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        default: '24'
+      working-directory:
+        type: string
+        default: '.'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build
+        run: npm run build --if-present
+
+      # tag 和 manifest 版本不一致时，release.mjs 会按 manifest 版本生成绝对
+      # 下载地址，结果指向一个不存在的 tag —— 在这里就拦下。
+      - name: Check tag matches manifest version
+        if: github.ref_type == 'tag'
+        run: |
+          expected="v$(node -p "require('./manifest.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "${expected}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} ≠ manifest version ${expected} — bump manifest.json or retag"
+            exit 1
+          fi
+
+      - name: Package and generate index
+        run: |
+          VERSION="$(node -p "require('./manifest.json').version")"
+          node scripts/release.mjs --out dist-packages --repo "$GITHUB_REPOSITORY" --tag "v${VERSION}"
+
+      - name: Assert the package index is complete
+        run: |
+          node -e "
+            const idx = require('./dist-packages/index.json');
+            const p = idx.plugins?.[0];
+            if (!p || !p.sha256 || !p.url) {
+              console.error('::error::dist-packages/index.json is incomplete');
+              process.exit(1);
+            }
+            if (!/^https:\/\//.test(p.url)) {
+              console.error('::error::index url is not absolute: ' + p.url);
+              process.exit(1);
+            }
+            console.log(p.id + '@' + p.version + ' → ' + p.url);
+          "
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v$(node -p "require('./manifest.json').version")"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::release $TAG already exists — bump manifest.json version before publishing"
+            exit 1
+          fi
+          gh release create "$TAG" \
+            dist-packages/*.zip dist-packages/index.json \
+            --title "$TAG" \
+            --generate-notes \
+            --latest
+          echo "published $TAG"
