@@ -1,5 +1,7 @@
 # PiWork-Registry
 
+[English](README.en.md) | 简体中文
+
 PiWork 的插件市场索引。**这里只放"去哪里找插件"，不放插件代码。**
 
 客户端读取的入口只有这一个：
@@ -37,7 +39,7 @@ sources.json
 
 插件必须**在自己的仓库里**发布，不需要官方仓库的写权限。要求：
 
-1. 插件仓库根目录有 `manifest.json`（字段见 `PiWork/docs/plugin-dev-guide.md`）。
+1. 插件仓库根目录有 `manifest.json`（字段见 [插件开发指南](https://github.com/PiWorkAgent/PiWork-Plugin-Docs/blob/main/docs/plugin-dev-guide.md)）。
 2. 仓库里有 `scripts/release.mjs`（从任意官方插件仓库复制）或等价实现：打包 zip + 生成单条目 `index.json`（带 `sha256` 和绝对 `url`）。
 3. 推送 tag `v<manifest.version>` 后，Release 里同时有 `<id>-<version>.zip` 和 `index.json`。
 4. 用 [插件上架申请](.github/PULL_REQUEST_TEMPLATE/plugin-submission.md) 提 PR，往 `sources.json` 加一条：
